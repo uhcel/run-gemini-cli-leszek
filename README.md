@@ -186,6 +186,16 @@ go to the [Gemini Assistant workflow documentation](./examples/workflows/gemini-
 -   <a name="__input_use_vertex_ai"></a><a href="#user-content-__input_use_vertex_ai"><code>use_vertex_ai</code></a>: _(Optional, default: `false`)_ Whether to use Vertex AI for Gemini model access instead of the default Gemini API key.
     For more information, see the [Gemini CLI documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/authentication.md).
 
+-   <a name="__input_proxy_environment"></a><a href="#user-content-__input_proxy_environment"><code>proxy_environment</code></a>: _(Optional)_ The environment for the proxy (e.g., "st", "dev").
+
+-   <a name="__input_proxy_url"></a><a href="#user-content-__input_proxy_url"><code>proxy_url</code></a>: _(Optional)_ The proxy URL to use for Gemini API calls.
+
+-   <a name="__input_proxy_auth_url"></a><a href="#user-content-__input_proxy_auth_url"><code>proxy_auth_url</code></a>: _(Optional)_ The URL to use for obtaining an access token via client credentials.
+
+-   <a name="__input_proxy_client_id"></a><a href="#user-content-__input_proxy_client_id"><code>proxy_client_id</code></a>: _(Optional)_ The client ID for proxy authentication.
+
+-   <a name="__input_proxy_client_secret"></a><a href="#user-content-__input_proxy_client_secret"><code>proxy_client_secret</code></a>: _(Optional)_ The client secret for proxy authentication.
+
 -   <a name="__input_extensions"></a><a href="#user-content-__input_extensions"><code>extensions</code></a>: _(Optional)_ A list of Gemini CLI extensions to install.
 
 -   <a name="__input_upload_artifacts"></a><a href="#user-content-__input_upload_artifacts"><code>upload_artifacts</code></a>: _(Optional, default: `false`)_ Whether to upload artifacts to the github action.

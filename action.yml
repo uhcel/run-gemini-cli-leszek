@@ -76,6 +76,22 @@ inputs:
       For more information, see the [Gemini CLI documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/authentication.md).
     required: false
     default: 'false'
+  proxy_environment:
+    description: 'The environment for the proxy (e.g., "st", "dev").'
+    required: false
+    default: ''
+  proxy_url:
+    description: 'The proxy URL to use for Gemini API calls.'
+    required: false
+  proxy_auth_url:
+    description: 'The URL to use for obtaining an access token via client credentials.'
+    required: false
+  proxy_client_id:
+    description: 'The client ID for proxy authentication.'
+    required: false
+  proxy_client_secret:
+    description: 'The client secret for proxy authentication.'
+    required: false
   extensions:
     description: 'A list of Gemini CLI extensions to install.'
     required: false
@@ -128,13 +144,14 @@ runs:
         if [[ "${INPUT_GEMINI_API_KEY_PRESENT:-false}" == "true" ]]; then ((++auth_methods)); fi
         if [[ "${INPUT_GOOGLE_API_KEY_PRESENT:-false}" == "true" ]]; then ((++auth_methods)); fi
         if [[ "${INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER_PRESENT:-false}" == "true" ]]; then ((++auth_methods)); fi
+        if [[ "${INPUT_PROXY_URL_PRESENT:-false}" == "true" ]]; then ((++auth_methods)); fi
 
         if [[ ${auth_methods} -eq 0 ]]; then
-          warn "No authentication method provided. Please provide one of 'gemini_api_key', 'google_api_key', or 'gcp_workload_identity_provider'."
+          warn "No authentication method provided. Please provide one of 'gemini_api_key', 'google_api_key', 'gcp_workload_identity_provider', or 'proxy_url'."
         fi
 
         if [[ ${auth_methods} -gt 1 ]]; then
-          warn "Multiple authentication methods provided. Please use only one of 'gemini_api_key', 'google_api_key', or 'gcp_workload_identity_provider'."
+          warn "Multiple authentication methods provided. Please use only one of 'gemini_api_key', 'google_api_key', 'gcp_workload_identity_provider', or 'proxy_url'."
         fi
 
         # Validate Workload Identity Federation inputs
@@ -168,10 +185,27 @@ runs:
             warn "When using 'gemini_api_key', both 'use_vertex_ai' and 'use_gemini_code_assist' must be 'false'."
           fi
         fi
+
+        # Validate Proxy Authentication
+        if [[ "${INPUT_PROXY_URL_PRESENT:-false}" == "true" ]]; then
+          if [[ "${INPUT_PROXY_AUTH_URL_PRESENT:-false}" != "true" ]]; then
+             warn "When using 'proxy_url', you must also provide 'proxy_auth_url'."
+          fi
+          if [[ "${INPUT_PROXY_CLIENT_ID_PRESENT:-false}" != "true" ]]; then
+             warn "When using 'proxy_url', you must also provide 'proxy_client_id'."
+          fi
+          if [[ "${INPUT_PROXY_CLIENT_SECRET_PRESENT:-false}" != "true" ]]; then
+             warn "When using 'proxy_url', you must also provide 'proxy_client_secret'."
+          fi
+        fi
       env:
         INPUT_GEMINI_API_KEY_PRESENT: "${{ inputs.gemini_api_key != '' }}"
         INPUT_GOOGLE_API_KEY_PRESENT: "${{ inputs.google_api_key != '' }}"
         INPUT_GCP_WORKLOAD_IDENTITY_PROVIDER_PRESENT: "${{ inputs.gcp_workload_identity_provider != '' }}"
+        INPUT_PROXY_URL_PRESENT: "${{ inputs.proxy_url != '' }}"
+        INPUT_PROXY_AUTH_URL_PRESENT: "${{ inputs.proxy_auth_url != '' }}"
+        INPUT_PROXY_CLIENT_ID_PRESENT: "${{ inputs.proxy_client_id != '' }}"
+        INPUT_PROXY_CLIENT_SECRET_PRESENT: "${{ inputs.proxy_client_secret != '' }}"
         INPUT_GCP_PROJECT_ID_PRESENT: "${{ inputs.gcp_project_id != '' }}"
         INPUT_GCP_SERVICE_ACCOUNT_PRESENT: "${{ inputs.gcp_service_account != '' }}"
         INPUT_GCP_TOKEN_FORMAT: '${{ inputs.gcp_token_format }}'
@@ -217,6 +251,46 @@ runs:
         service_account: '${{ inputs.gcp_service_account }}'
         token_format: '${{ inputs.gcp_token_format }}'
         access_token_scopes: '${{ inputs.gcp_access_token_scopes }}'
+
+    - name: 'Authenticate to Proxy'
+      if: |-
+        ${{ inputs.proxy_url != '' || inputs.proxy_environment != '' }}
+      id: 'proxy_auth'
+      shell: 'bash'
+      run: |-
+        set -euo pipefail
+
+        AUTH_URL="${PROXY_AUTH_URL}"
+        if [[ -z "${AUTH_URL}" && -n "${PROXY_ENVIRONMENT}" ]]; then
+           AUTH_URL="https://${PROXY_ENVIRONMENT}.api.genpt.com/oauthv2/token"
+        fi
+
+        if [[ -z "${AUTH_URL}" ]]; then
+          echo "::error::Either proxy_auth_url or proxy_environment must be provided when using proxy authentication."
+          exit 1
+        fi
+
+        # Perform client_credentials flow
+        # Expecting JSON response with "access_token"
+        response=$(curl -s -X POST "${AUTH_URL}" \
+          -d "grant_type=client_credentials" \
+          -d "client_id=${PROXY_CLIENT_ID}" \
+          -d "client_secret=${PROXY_CLIENT_SECRET}")
+
+        access_token=$(echo "$response" | jq -r '.access_token // empty')
+
+        if [[ -z "$access_token" ]]; then
+          echo "::error::Failed to retrieve access token from proxy auth. Response: $response"
+          exit 1
+        fi
+
+        echo "::add-mask::$access_token"
+        echo "access_token=$access_token" >> "$GITHUB_OUTPUT"
+      env:
+        PROXY_ENVIRONMENT: '${{ inputs.proxy_environment }}'
+        PROXY_AUTH_URL: '${{ inputs.proxy_auth_url }}'
+        PROXY_CLIENT_ID: '${{ inputs.proxy_client_id }}'
+        PROXY_CLIENT_SECRET: '${{ inputs.proxy_client_secret }}'
 
     - name: 'Install pnpm'
       if: |-
@@ -403,15 +477,18 @@ runs:
         fi
       env:
         GEMINI_DEBUG: '${{ fromJSON(inputs.gemini_debug || false) }}'
-        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
         SURFACE: 'GitHub'
         GOOGLE_CLOUD_PROJECT: '${{ inputs.gcp_project_id }}'
         GOOGLE_CLOUD_LOCATION: '${{ inputs.gcp_location }}'
-        GOOGLE_GENAI_USE_VERTEXAI: '${{ inputs.use_vertex_ai }}'
-        GOOGLE_API_KEY: '${{ inputs.google_api_key }}'
+        GOOGLE_GENAI_USE_VERTEXAI: "${{ inputs.proxy_url != '' || inputs.proxy_environment != '' ? 'false' : inputs.use_vertex_ai }}"
+        GOOGLE_API_KEY: "${{ inputs.proxy_url != '' || inputs.proxy_environment != '' ? '' : inputs.google_api_key }}"
         GOOGLE_GENAI_USE_GCA: '${{ inputs.use_gemini_code_assist }}'
-        GOOGLE_CLOUD_ACCESS_TOKEN: '${{steps.auth.outputs.access_token}}'
+        GOOGLE_CLOUD_ACCESS_TOKEN: '${{ steps.auth.outputs.access_token || steps.proxy_auth.outputs.access_token }}'
+        GEMINI_BASE_URL: |-
+          ${{ inputs.proxy_url || (inputs.proxy_environment != '' && format('https://{0}.api.genpt.com/genaisp/gas/proxy/gemini/v1beta1/publishers/google', inputs.proxy_environment)) || '' }}
         PROMPT: '${{ inputs.prompt }}'
+        GEMINI_API_VERSION: "${{ inputs.proxy_url != '' || inputs.proxy_environment != '' ? '' : '' }}"
+        GEMINI_API_KEY: "${{ inputs.proxy_url != '' || inputs.proxy_environment != '' ? 'DUMMY' : inputs.gemini_api_key }}"
         GEMINI_MODEL: '${{ inputs.gemini_model }}'
         GH_WORKFLOW_NAME: '${{ steps.sanitize_workflow_name.outputs.gh_workflow_name }}'
 

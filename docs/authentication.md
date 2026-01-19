@@ -237,6 +237,37 @@ After running the `setup_workload_identity.sh` script, add the following variabl
 > [!NOTE]
 > You can use direct Workload Identity Federation without a service account by setting `gcp_token_format: ''` and omitting `gcp_service_account`.
 
+### Method 4: Authenticating with a Proxy
+
+This method allows you to use a custom proxy for Gemini API calls, authenticating via a static Client ID and Client Secret.
+
+#### Prerequisites
+
+- A proxy URL and an authentication URL.
+- A Client ID and Client Secret for the proxy authentication.
+
+#### Setup
+
+1.  **Add to GitHub Secrets**: In your GitHub repository, go to **Settings > Secrets and variables > Actions** and add new repository secrets:
+    - `PROXY_CLIENT_ID`: Your Client ID.
+    - `PROXY_CLIENT_SECRET`: Your Client Secret.
+2.  **Add to GitHub Variables**: Add variables for your URLs:
+    - `PROXY_URL`: The base URL for the Gemini API proxy.
+    - `PROXY_AUTH_URL`: The URL to obtain the access token.
+
+#### Example
+
+```yaml
+- uses: 'google-github-actions/run-gemini-cli@v0'
+  with:
+    prompt: |-
+      Explain this code
+    proxy_url: '${{ vars.PROXY_URL }}'
+    proxy_auth_url: '${{ vars.PROXY_AUTH_URL }}'
+    proxy_client_id: '${{ secrets.PROXY_CLIENT_ID }}'
+    proxy_client_secret: '${{ secrets.PROXY_CLIENT_SECRET }}'
+```
+
 ## GitHub Authentication
 
 This action requires a GitHub token to interact with the GitHub API. You can authenticate in two ways:
