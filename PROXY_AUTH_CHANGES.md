@@ -53,6 +53,7 @@ Updated the environment variable configuration:
 - **`GOOGLE_API_KEY`**: Cleared (empty string) when using proxy.
 - **`GOOGLE_CLOUD_ACCESS_TOKEN`**: Uses the token from `steps.proxy_auth.outputs.access_token` if available.
 - **`GEMINI_BASE_URL`**: Dynamically constructed. If `proxy_environment` is used, it sets the URL to `https://{env}.api.genpt.com/genaisp/gas/proxy/gemini/v1beta1/publishers/google`.
+- **`GOOGLE_GEMINI_BASE_URL`**: Same as `GEMINI_BASE_URL`. Added for compatibility with newer versions of the Google GenAI SDK which prefer this variable.
 - **`GEMINI_API_VERSION`**: Set to empty string `''` to prevent the SDK from appending default version paths (simulating the monkeypatch behavior).
 - **`GEMINI_API_KEY`**: Set to `'DUMMY'` to satisfy SDK validation without sending a real key to the proxy.
 

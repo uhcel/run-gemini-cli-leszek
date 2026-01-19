@@ -486,6 +486,8 @@ runs:
         GOOGLE_CLOUD_ACCESS_TOKEN: '${{ steps.auth.outputs.access_token || steps.proxy_auth.outputs.access_token }}'
         GEMINI_BASE_URL: |-
           ${{ inputs.proxy_url || (inputs.proxy_environment != '' && format('https://{0}.api.genpt.com/genaisp/gas/proxy/gemini/v1beta1/publishers/google', inputs.proxy_environment)) || '' }}
+        GOOGLE_GEMINI_BASE_URL: |-
+          ${{ inputs.proxy_url || (inputs.proxy_environment != '' && format('https://{0}.api.genpt.com/genaisp/gas/proxy/gemini/v1beta1/publishers/google', inputs.proxy_environment)) || '' }}
         PROMPT: '${{ inputs.prompt }}'
         GEMINI_API_VERSION: "${{ inputs.proxy_url != '' || inputs.proxy_environment != '' ? '' : '' }}"
         GEMINI_API_KEY: "${{ inputs.proxy_url != '' || inputs.proxy_environment != '' ? 'DUMMY' : inputs.gemini_api_key }}"
